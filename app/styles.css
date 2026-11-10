@@ -141,3 +141,10 @@ body.busy { cursor: progress; } body.busy .drawer-foot .btn { opacity: .6; point
 .ev-n { font-weight:500; }
 .small { font-size:12px; }
 .chip.small { font-size:11px; padding:1px 6px; }
+.cal-chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 10px; }
+.cchip { display:inline-flex; align-items:center; gap:6px; border:1px solid #d6dbe4; background:#fff; border-radius:999px; padding:5px 12px; font:inherit; font-size:13px; cursor:pointer; }
+.cchip.on { background:#1f3b63; color:#fff; border-color:#1f3b63; }
+.cchip.add { border-style:dashed; color:#2f6fdf; }
+.ev-dot { display:inline-block; width:9px; height:9px; border-radius:50%; flex:none; align-self:center; }
+.cal-add input.cal-name { max-width:240px; }
+.cal-add input.cal-url { flex:1; min-width:240px; }

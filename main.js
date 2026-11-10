@@ -111,6 +111,7 @@ ipcMain.handle('cal:add', (_e, name, url) => {
   const u = String(url || '').trim(); const n = String(name || '').trim().slice(0, 30) || '我的日曆';
   if (!CAL_OK(u)) throw new Error('網址不對：要用 Google 日曆設定裡「iCal 格式的私人網址」，開頭是 https://calendar.google.com/calendar/ical/ ，結尾是 .ics');
   const arr = readCals(); if (arr.some((c) => c.url === u)) throw new Error('這個日曆已經加過了');
+  if (arr.some((c) => c.name === n)) throw new Error(`已經有叫「${n}」的分類了，換個名稱`);
   arr.push({ name: n, url: u }); writeCals(arr); return true;
 });
 ipcMain.handle('cal:remove', (_e, i) => { const arr = readCals(); arr.splice(Number(i), 1); writeCals(arr); return true; });

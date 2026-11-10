@@ -207,7 +207,7 @@
       h('div', { class: 'cards' },
         calNative() ? (() => {
           const t0 = dayStart(new Date()); const t1 = new Date(t0); t1.setDate(t1.getDate() + 1);
-          const evs = eventsBetween(t0, t1);
+          const evs = eventsBetween(t0, t1, true);
           return h('div', { class: 'card', id: 'today-cal' }, h('h3', {}, '今天行程'),
             evs.length ? h('ul', { class: 'evs' }, evs.map(eventLine)) : h('p', { class: 'muted' }, Object.keys(calCache()).length ? '今天沒有行程' : '還沒接 Google 日曆（到設定加入）'),
             h('a', { href: '#', onclick: (e) => { e.preventDefault(); go('calendar'); } }, '看兩週行程 →'));
@@ -430,21 +430,43 @@
   function calFromCache() { const c = calCache(); return Object.keys(c).map((k) => ({ name: k, text: c[k].text })); }
   const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+  const CAL_COLORS = ['#d93025', '#f2a600', '#1e8e3e', '#e67c73', '#7986cb', '#3f51b5', '#0b8043', '#8e24aa', '#039be5', '#616161'];
+  const calNames = () => (cal.list.length ? cal.list : calFromCache()).map((c) => c.name);
+  const calColor = (name) => { const i = calNames().indexOf(name); return CAL_COLORS[(i < 0 ? 0 : i) % CAL_COLORS.length]; };
   function eventLine(e) {
     const time = e.allDay ? '整天' : `${IC.hm(e.start)}–${IC.hm(e.end)}`;
-    return h('li', { class: 'ev' }, h('span', { class: 'ev-t' }, time), h('span', { class: 'ev-n' }, e.title),
-      e.location ? h('span', { class: 'muted' }, `📍${e.location}`) : null,
-      cal.list.length > 1 ? h('span', { class: 'chip small' }, e.calendar) : null);
+    return h('li', { class: 'ev' }, h('span', { class: 'ev-dot', style: `background:${calColor(e.calendar)}`, title: e.calendar }), h('span', { class: 'ev-t' }, time), h('span', { class: 'ev-n' }, e.title),
+      e.location ? h('span', { class: 'muted' }, `📍${e.location}`) : null);
   }
-  function eventsBetween(from, to) { const l = cal.list.length ? cal.list : calFromCache(); return IC.between(l, from, to); }
+  // 選了哪個分類（空白＝全部），記在這台電腦
+  const calPick = () => { const p = cfg().calPick || ''; return calNames().includes(p) ? p : ''; };
+  function eventsBetween(from, to, all) {
+    const l = cal.list.length ? cal.list : calFromCache(); const p = all ? '' : calPick();
+    return IC.between(p ? l.filter((c) => c.name === p) : l, from, to);
+  }
+  // 新增分類（＝加一個 Google 日曆）的小表單，設定頁和行程頁共用
+  function calAddForm(after) {
+    const name = h('input', { type: 'text', class: 'cal-name', placeholder: '分類名稱，跟 Google 日曆同名，例如：打工', maxlength: 30 });
+    const url = h('input', { type: 'password', class: 'cal-url', placeholder: '貼上這個日曆的「非公開網址 (iCal 格式)」', autocomplete: 'off' });
+    return h('div', { class: 'row wrap cal-add' }, name, url, h('button', { class: 'btn primary btn-cal-add', onclick: () => lock(async () => {
+      const n = name.value.trim(); const u = url.value.trim();
+      if (!n) throw new UserError('請填分類名稱（跟 Google 日曆裡的名字一樣，例如：打工）');
+      if (!u) throw new UserError('請貼上日曆網址');
+      try { await window.leiyiNative.calendar.add(n, u); } catch (e) { throw new UserError(String(e.message || e).replace(/^.*Error: /, '')); }
+      await loadCalendars(true);
+      toast(cal.errors.length ? cal.errors[0] : `已加入「${n}」`, !!cal.errors.length);
+      if (after) after();
+    }) }, '加入'));
+  }
   function calendarPage() {
     const wrap = h('div');
     if (!calNative()) { wrap.append(h('div', { class: 'card' }, h('p', {}, '只有桌面版 APP 可以讀 Google 日曆。'))); return wrap; }
+    let addOpen = false;
     const draw = async () => {
       const names = await window.leiyiNative.calendar.list();
       if (!names.length) {
-        wrap.replaceChildren(h('div', { class: 'card' }, h('h3', {}, '還沒接 Google 日曆'), h('p', {}, '到「設定 → Google 日曆」貼上日曆的私人網址就能在這裡看到行程。'),
-          h('button', { class: 'btn primary', onclick: () => go('settings') }, '去設定')));
+        wrap.replaceChildren(h('div', { class: 'card' }, h('h3', {}, '還沒接 Google 日曆'), h('p', {}, '到 Google 日曆「設定」→ 左邊點你的日曆 →「整合日曆」→ 複製「非公開網址 (iCal 格式)」，貼在下面。名稱填跟 Google 日曆一樣的名字。'),
+          calAddForm(() => draw())));
         return;
       }
       const today = dayStart(new Date());
@@ -467,6 +489,12 @@
           h('button', { class: 'btn', onclick: () => shift(7) }, '下一週 ›'),
           h('button', { class: 'btn', id: 'btn-cal-refresh', onclick: () => lock(async () => { await loadCalendars(true); draw(); toast(cal.errors.length ? cal.errors[0] : '已更新行程', !!cal.errors.length); }) }, '⟳ 重新整理'),
           h('a', { class: 'btn primary', href: IC.addUrl('', IC.ymd(today)), target: '_blank', rel: 'noopener' }, '＋ 在 Google 日曆新增')),
+        h('div', { class: 'cal-chips' },
+          h('button', { class: 'cchip' + (calPick() ? '' : ' on'), onclick: () => guard(async () => { cfg().calPick = ''; await Store.save(); draw(); }) }, '全部'),
+          calNames().map((n) => h('button', { class: 'cchip' + (calPick() === n ? ' on' : ''), 'data-cal': n, onclick: () => guard(async () => { cfg().calPick = n; await Store.save(); draw(); }) },
+            h('span', { class: 'ev-dot', style: `background:${calColor(n)}` }), n)),
+          h('button', { class: 'cchip add', id: 'btn-cal-new', onclick: () => { addOpen = !addOpen; draw(); } }, addOpen ? '× 取消' : '＋ 新增分類')),
+        addOpen ? h('div', { class: 'card' }, h('p', { class: 'muted' }, '到 Google 日曆「設定」→ 左邊點那個日曆 →「整合日曆」→ 複製「非公開網址 (iCal 格式)」。名稱填跟 Google 日曆一樣的名字。'), calAddForm(() => { addOpen = false; draw(); })) : null,
         cal.errors.length ? h('div', { class: 'alert' }, cal.errors.join('；'), '（先顯示上次讀到的行程）') : null,
         h('p', { class: 'muted' }, `${IC.ymd(from)} 起兩週，共 ${evs.length} 個行程${cal.loadedAt ? `｜更新於 ${new Date(cal.loadedAt).toLocaleTimeString('zh-TW', { hour12: false })}` : ''}`),
         h('div', { class: 'days' }, days));
@@ -481,20 +509,13 @@
     const body = h('div'); card.append(body);
     const draw = async () => {
       const names = await window.leiyiNative.calendar.list();
-      const name = h('input', { type: 'text', id: 'cal-name', placeholder: '名稱，例如：Connie', maxlength: 30 });
-      const url = h('input', { type: 'password', id: 'cal-url', placeholder: '貼上 iCal 格式的私人網址', autocomplete: 'off' });
       body.replaceChildren(
-        h('p', { class: 'muted' }, '取得網址：電腦版 Google 日曆 → 右上齒輪「設定」→ 左邊點你的日曆 → 往下找「整合日曆」→「iCal 格式的私人網址」按複製。網址只會加密存在這台電腦。'),
-        names.length ? h('ul', { class: 'mini', id: 'cal-list' }, names.map((c) => h('li', {}, `📅 ${c.name}`, h('button', { class: 'btn small danger', onclick: () => lock(async () => {
+        h('p', { class: 'muted' }, '每個 Google 日曆是一個分類，要分別加入。取得網址：電腦版 Google 日曆 → 右上齒輪「設定」→ 左邊點那個日曆 →「整合日曆」→ 複製「非公開網址 (iCal 格式)」。名稱填跟 Google 日曆一樣的名字（例如：打工）。網址只會加密存在這台電腦。'),
+        names.length ? h('ul', { class: 'mini', id: 'cal-list' }, names.map((c) => h('li', {}, h('span', {}, h('span', { class: 'ev-dot', style: `background:${calColor(c.name)}` }), c.name), h('button', { class: 'btn small danger', onclick: () => lock(async () => {
           if (!window.confirm(`移除「${c.name}」？（不會影響 Google 日曆本身）`)) return;
           await window.leiyiNative.calendar.remove(c.index); cal.loadedAt = 0; delete calCache()[c.name]; await Store.save(); draw();
         }) }, '移除')))) : h('p', {}, '還沒有接任何日曆。'),
-        h('div', { class: 'row wrap' }, name, url, h('button', { class: 'btn primary', id: 'btn-cal-add', onclick: () => lock(async () => {
-          const u = url.value.trim(); if (!u) throw new UserError('請貼上日曆網址');
-          try { await window.leiyiNative.calendar.add(name.value.trim() || '我的日曆', u); } catch (e) { throw new UserError(String(e.message || e).replace(/^.*Error: /, '')); }
-          await loadCalendars(true);
-          toast(cal.errors.length ? cal.errors[0] : '已接上 Google 日曆', !!cal.errors.length); draw();
-        }) }, '加入')));
+        calAddForm(() => draw()));
     };
     guard(draw);
     return card;

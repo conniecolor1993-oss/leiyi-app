@@ -194,22 +194,35 @@ const newRec = async (mod) => { await nav(mod); await pg.click('#btn-new'); awai
 
     // ---- Google 日曆 ----
     await nav('settings');
-    await pg.fill('#cal-url', 'https://example.com/a.ics'); await pg.click('#btn-cal-add'); await sleep(200);
+    await pg.fill('#cal-card .cal-name', '打工'); await pg.fill('#cal-card .cal-url', 'https://example.com/a.ics'); await pg.click('#cal-card .btn-cal-add'); await sleep(200);
     check('日曆網址不對會擋', /網址不對/.test(await lastToast()), await lastToast());
-    await pg.fill('#cal-name', 'Connie'); await pg.fill('#cal-url', BASE + '/cal/test.ics'); await pg.click('#btn-cal-add'); await sleep(600);
+    await pg.fill('#cal-card .cal-name', 'Connie'); await pg.fill('#cal-card .cal-url', BASE + '/cal/test.ics'); await pg.click('#cal-card .btn-cal-add'); await sleep(600);
     check('加入日曆', (await pg.locator('#cal-list').innerText()).includes('Connie'));
     check('日曆網址不在畫面資料裡', !JSON.stringify(await S(() => window.LeiyiStore.Store.data)).includes('/cal/test.ics'));
     await nav('calendar'); await sleep(500);
     const calText = await pg.locator('.days').innerText();
     check('行程頁顯示今天的行程', calText.includes('今天的測試會議') && calText.includes('09:00–10:00') && calText.includes('雷翼辦公室'), calText.slice(0, 200));
     check('每週重複行程出現兩次（兩週）', (calText.match(/每週例行/g) || []).length === 2);
+    // 行程頁新增第二個分類、切換分類
+    await pg.click('#btn-cal-new'); await sleep(100);
+    await pg.fill('.cal-add .cal-name', 'Connie'); await pg.fill('.cal-add .cal-url', BASE + '/cal/work.ics'); await pg.click('.cal-add .btn-cal-add'); await sleep(300);
+    check('分類名稱重複會擋', /已經有叫「Connie」/.test(await lastToast()), await lastToast());
+    await pg.fill('.cal-add .cal-name', '打工'); await pg.click('.cal-add .btn-cal-add'); await sleep(600);
+    check('行程頁可新增分類', (await pg.locator('.cal-chips').innerText()).includes('打工'));
+    check('全部時兩個分類的行程都在', ((await pg.locator('.days').innerText()).match(/今天的測試會議/g) || []).length === 2);
+    await pg.click('[data-cal="打工"]'); await sleep(200);
+    check('選分類只顯示該分類', ((await pg.locator('.days').innerText()).match(/今天的測試會議/g) || []).length === 1 && (await pg.locator('.cchip.on').innerText()).includes('打工'));
+    await nav('home'); await nav('calendar'); await sleep(200);
+    check('分類選擇會記住', (await pg.locator('.cchip.on').innerText()).includes('打工'));
+    await pg.click('.cal-chips .cchip >> nth=0'); await sleep(200);
+    check('按全部恢復', (await pg.locator('.cchip.on').innerText()).trim() === '全部');
     await nav('home'); await sleep(200);
     check('首頁顯示今天行程', (await pg.locator('#today-cal').innerText()).includes('今天的測試會議'));
     for (const r of ['home', 'calendar', 'settings', 'tasks', 'projects', 'ledger', 'inbox', 'pending']) { await nav(r); await sleep(250); const t = await pg.locator('main').innerText(); check(`${r} 頁沒有 null/undefined 字樣`, !/\bnull\b|\bundefined\b|NaN/.test(t), t.match(/.{0,20}(null|undefined|NaN).{0,20}/)); }
     await ctl('set', { calDown: true }); await nav('calendar'); await pg.click('#btn-cal-refresh'); await sleep(500);
     check('日曆失效時顯示原因並保留上次行程', (await pg.locator('.alert').innerText()).includes('網址失效') && (await pg.locator('.days').innerText()).includes('今天的測試會議'));
     await ctl('set', { calDown: false });
-    await nav('settings'); await pg.click('#cal-list button'); await sleep(300);
+    await nav('settings'); await pg.click('#cal-list button'); await sleep(300); await pg.click('#cal-list button'); await sleep(300);
     check('移除日曆', (await pg.locator('#cal-list').count()) === 0);
 
     // ---- 中斷連線 ----
