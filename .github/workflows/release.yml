@@ -1,9 +1,11 @@
-# 推上 v 開頭的版本標籤（例如 v1.2.0）時，在 Windows 機器上打包安裝檔並發佈到 GitHub Releases
-# 已安裝的 APP 會從這裡自動下載新版
+# package.json 版本號一改並推上 main，就在 Windows 機器上打包安裝檔並發佈到 GitHub Releases（標籤 v版本號自動建立）
+# 已安裝的 APP 會從這裡自動下載新版。也可以在 Actions 頁手動按 Run workflow。
 name: release
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['package.json']
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
