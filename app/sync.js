@@ -376,12 +376,15 @@
 
   // ---------- 對外 ----------
   let running = null;
+  let schemasFresh = false;
   async function syncNow() {
     if (Store.data.settings.mode !== 'notion') return;
     if (running) return running;
     running = (async () => {
       setStatus('syncing', '同步中…');
       try {
+        // 每次開啟 APP 第一次同步時重新讀 Notion 欄位，Notion 新增的欄位才接得上
+        if (!schemasFresh) { S().schemas = await loadSchemas(S().mapping); schemasFresh = true; await Store.save(); }
         await push();
         await pull();
         if (S().queue.length) await push();

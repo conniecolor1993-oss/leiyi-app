@@ -187,6 +187,7 @@ window.UserError = UserError;
       desc: '每天要做的事。勾「今天三件」的最多 3 件，首頁會顯示。',
       fields: [
         { key: '事情', type: 'text', required: true, list: true },
+        { key: '專案', type: 'relation', module: 'projects', list: true, filter: false, hint: '這件事屬於哪個專案（可不選）' },
         { key: '狀態', type: 'select', options: TASK_STATUS, default: '待做', list: true, filter: true },
         { key: '今天三件', type: 'checkbox', list: true, filter: true, hint: '最多 3 件' },
         { key: '安排日期', type: 'date', default: 'today', list: true },

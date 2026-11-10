@@ -183,6 +183,7 @@ const newRec = async (mod) => { await nav(mod); await pg.click('#btn-new'); awai
     await app.close(); await launch(); await sleep(500); await idle();
     const after = { t: (await dsPages('工作任務總表')).length, l: (await dsPages('帳務')).length };
     check('重開後不會重複上傳', before.t === after.t && before.l === after.l, { before, after });
+    check('重開後重新讀 Notion 欄位', (await S(() => !!window.LeiyiStore.Store.data.sync.schemas.tasks.事情)));
     check('重開後資料還在', (await rows('tasks')).some((r) => r.事情 === '離線新增'));
     check('重開後還是 Notion 模式', (await S(() => window.LeiyiStore.Store.data.settings.mode)) === 'notion');
     check('金鑰不在畫面資料裡', !JSON.stringify(await S(() => window.LeiyiStore.Store.data)).includes(TOKEN));
