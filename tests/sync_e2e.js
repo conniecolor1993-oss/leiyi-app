@@ -22,7 +22,7 @@ const hex = (id) => id.replace(/-/g, '');
 
 let app, pg;
 async function launch() {
-  app = await electron.launch({ executablePath: require(path.join(ROOT, 'node_modules', 'electron')), args: [ROOT, '--no-sandbox'], env: Object.assign({}, process.env, { LEIYI_NOTION_BASE: BASE, LEIYI_USER_DATA: userData }) });
+  app = await electron.launch({ executablePath: require(path.join(ROOT, 'node_modules', 'electron')), args: [ROOT, '--no-sandbox'], env: Object.assign({}, process.env, { LEIYI_NOTION_BASE: BASE, LEIYI_USER_DATA: userData, LEIYI_ICAL_ALLOW: BASE + '/cal/', TZ: 'Asia/Taipei' }) });
   pg = await app.firstWindow();
   pg.on('pageerror', (e) => pageErrors.push(String(e)));
   pg.on('console', (m) => { if (m.type() === 'error') pageErrors.push(m.text()); });
@@ -191,6 +191,25 @@ const newRec = async (mod) => { await nav(mod); await pg.click('#btn-new'); awai
     // 不允許的路徑
     const bad = await S(() => window.leiyiNative.notion.request('DELETE', '/v1/blocks/x'));
     check('主程式擋掉不允許的 Notion 路徑', bad.status === 400);
+
+    // ---- Google 日曆 ----
+    await nav('settings');
+    await pg.fill('#cal-url', 'https://example.com/a.ics'); await pg.click('#btn-cal-add'); await sleep(200);
+    check('日曆網址不對會擋', /網址不對/.test(await lastToast()), await lastToast());
+    await pg.fill('#cal-name', 'Connie'); await pg.fill('#cal-url', BASE + '/cal/test.ics'); await pg.click('#btn-cal-add'); await sleep(600);
+    check('加入日曆', (await pg.locator('#cal-list').innerText()).includes('Connie'));
+    check('日曆網址不在畫面資料裡', !JSON.stringify(await S(() => window.LeiyiStore.Store.data)).includes('/cal/test.ics'));
+    await nav('calendar'); await sleep(500);
+    const calText = await pg.locator('.days').innerText();
+    check('行程頁顯示今天的行程', calText.includes('今天的測試會議') && calText.includes('09:00–10:00') && calText.includes('雷翼辦公室'), calText.slice(0, 200));
+    check('每週重複行程出現兩次（兩週）', (calText.match(/每週例行/g) || []).length === 2);
+    await nav('home'); await sleep(200);
+    check('首頁顯示今天行程', (await pg.locator('#today-cal').innerText()).includes('今天的測試會議'));
+    await ctl('set', { calDown: true }); await nav('calendar'); await pg.click('#btn-cal-refresh'); await sleep(500);
+    check('日曆失效時顯示原因並保留上次行程', (await pg.locator('.alert').innerText()).includes('網址失效') && (await pg.locator('.days').innerText()).includes('今天的測試會議'));
+    await ctl('set', { calDown: false });
+    await nav('settings'); await pg.click('#cal-list button'); await sleep(300);
+    check('移除日曆', (await pg.locator('#cal-list').count()) === 0);
 
     // ---- 中斷連線 ----
     await nav('settings'); await pg.click('#btn-notion-off'); await sleep(300);

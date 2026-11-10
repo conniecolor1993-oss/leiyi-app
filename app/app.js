@@ -138,7 +138,7 @@
     page.append(head);
     const body = h('section', { class: 'page-body' });
     page.append(body);
-    const view = { dashboard: dashboard, table: tablePage, tax: taxPage, placeholder: placeholderPage, rules: rulesPage, tools: toolsPage, settings: settingsPage }[m.kind];
+    const view = { dashboard: dashboard, table: tablePage, tax: taxPage, placeholder: placeholderPage, calendar: calendarPage, rules: rulesPage, tools: toolsPage, settings: settingsPage }[m.kind];
     body.append(view(m));
     if (m.kind === 'table' && state.open) openDrawer(m, state.open === 'new' ? null : state.open);
   }
@@ -200,6 +200,13 @@
         kpi('應收逾期', overdue, 'ledger', overdue > 0)),
       big > cfg().maxBigProjects ? h('div', { class: 'alert' }, `大專案有 ${big} 個，超過上限 ${cfg().maxBigProjects} 個，建議暫停其中一個。`) : null,
       h('div', { class: 'cards' },
+        calNative() ? (() => {
+          const t0 = dayStart(new Date()); const t1 = new Date(t0); t1.setDate(t1.getDate() + 1);
+          const evs = eventsBetween(t0, t1);
+          return h('div', { class: 'card', id: 'today-cal' }, h('h3', {}, '今天行程'),
+            evs.length ? h('ul', { class: 'evs' }, evs.map(eventLine)) : h('p', { class: 'muted' }, Object.keys(calCache()).length ? '今天沒有行程' : '還沒接 Google 日曆（到設定加入）'),
+            h('a', { href: '#', onclick: (e) => { e.preventDefault(); go('calendar'); } }, '看兩週行程 →'));
+        })() : null,
         mini('今天三件', top3, tm, (r) => r.狀態),
         mini('今天該做（含逾期）', todayTasks, tm, (r) => (r.安排日期 < td ? `逾期 ${r.安排日期}` : r.狀態)),
         mini('等你確認（最久的在前）', pend, modById('pending'), (r) => `等 ${L.F.daysSince(r._created)} 天`),
@@ -394,6 +401,100 @@
   function deadline(p) { const [y, n] = p.split('-P').map(Number); const m = Number(n) * 2 + 1; return m > 12 ? `${y + 1}-01-15` : `${y}-${String(m).padStart(2, '0')}-15`; }
 
   // ---------- 其他頁 ----------
+  // ---------- Google 日曆（只讀） ----------
+  const IC = window.LeiyiICal;
+  const cal = { list: [], errors: [], loading: false, loadedAt: 0, from: null };
+  const calNative = () => window.leiyiNative && window.leiyiNative.calendar;
+  function calCache() { return (Store.data.calCache = Store.data.calCache || {}); }
+  async function loadCalendars(force) {
+    if (!calNative() || cal.loading) return;
+    if (!force && Date.now() - cal.loadedAt < 5 * 60 * 1000) return;
+    cal.loading = true;
+    try {
+      const res = await window.leiyiNative.calendar.fetch();
+      const cache = calCache(); const list = []; const errors = [];
+      for (const r of res) {
+        if (r.text) { cache[r.name] = { text: r.text, at: new Date().toISOString() }; list.push({ name: r.name, text: r.text }); }
+        else { errors.push(`${r.name}：${r.error}`); if (cache[r.name]) list.push({ name: r.name, text: cache[r.name].text }); }
+      }
+      for (const k of Object.keys(cache)) if (!res.some((r) => r.name === k)) delete cache[k];
+      cal.list = list; cal.errors = errors; cal.loadedAt = Date.now();
+      await Store.save();
+    } finally { cal.loading = false; }
+  }
+  function calFromCache() { const c = calCache(); return Object.keys(c).map((k) => ({ name: k, text: c[k].text })); }
+  const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+  function eventLine(e) {
+    const time = e.allDay ? '整天' : `${IC.hm(e.start)}–${IC.hm(e.end)}`;
+    return h('li', { class: 'ev' }, h('span', { class: 'ev-t' }, time), h('span', { class: 'ev-n' }, e.title),
+      e.location ? h('span', { class: 'muted' }, `📍${e.location}`) : null,
+      cal.list.length > 1 ? h('span', { class: 'chip small' }, e.calendar) : null);
+  }
+  function eventsBetween(from, to) { const l = cal.list.length ? cal.list : calFromCache(); return IC.between(l, from, to); }
+  function calendarPage() {
+    const wrap = h('div');
+    if (!calNative()) { wrap.append(h('div', { class: 'card' }, h('p', {}, '只有桌面版 APP 可以讀 Google 日曆。'))); return wrap; }
+    const draw = async () => {
+      const names = await window.leiyiNative.calendar.list();
+      if (!names.length) {
+        wrap.replaceChildren(h('div', { class: 'card' }, h('h3', {}, '還沒接 Google 日曆'), h('p', {}, '到「設定 → Google 日曆」貼上日曆的私人網址就能在這裡看到行程。'),
+          h('button', { class: 'btn primary', onclick: () => go('settings') }, '去設定')));
+        return;
+      }
+      const today = dayStart(new Date());
+      const from = cal.from || today; const to = new Date(from); to.setDate(to.getDate() + 14);
+      const evs = eventsBetween(from, to);
+      const days = [];
+      for (let d = new Date(from); d < to; d.setDate(d.getDate() + 1)) {
+        const ds = new Date(d); const de = new Date(d); de.setDate(de.getDate() + 1);
+        const list = evs.filter((e) => e.start < de && e.end > ds);
+        const isToday = ds.getTime() === today.getTime();
+        days.push(h('div', { class: 'day' + (isToday ? ' today' : '') + (list.length ? '' : ' empty') },
+          h('div', { class: 'day-h' }, `${ds.getMonth() + 1}/${ds.getDate()}（${WEEK[ds.getDay()]}）${isToday ? '　今天' : ''}`),
+          list.length ? h('ul', { class: 'evs' }, list.map(eventLine)) : h('div', { class: 'muted small' }, '沒有行程')));
+      }
+      const shift = (n) => { const f = new Date(from); f.setDate(f.getDate() + n); cal.from = f; draw(); };
+      wrap.replaceChildren(
+        h('div', { class: 'toolbar' },
+          h('button', { class: 'btn', onclick: () => shift(-7) }, '‹ 上一週'),
+          h('button', { class: 'btn', onclick: () => { cal.from = null; draw(); } }, '今天'),
+          h('button', { class: 'btn', onclick: () => shift(7) }, '下一週 ›'),
+          h('button', { class: 'btn', id: 'btn-cal-refresh', onclick: () => lock(async () => { await loadCalendars(true); draw(); toast(cal.errors.length ? cal.errors[0] : '已更新行程', !!cal.errors.length); }) }, '⟳ 重新整理'),
+          h('a', { class: 'btn primary', href: IC.addUrl('', IC.ymd(today)), target: '_blank', rel: 'noopener' }, '＋ 在 Google 日曆新增')),
+        cal.errors.length ? h('div', { class: 'alert' }, cal.errors.join('；'), '（先顯示上次讀到的行程）') : null,
+        h('p', { class: 'muted' }, `${IC.ymd(from)} 起兩週，共 ${evs.length} 個行程${cal.loadedAt ? `｜更新於 ${new Date(cal.loadedAt).toLocaleTimeString('zh-TW', { hour12: false })}` : ''}`),
+        h('div', { class: 'days' }, days));
+    };
+    wrap.append(h('p', { class: 'muted' }, '讀取行程中…'));
+    guard(async () => { await draw(); await loadCalendars(false); await draw(); });
+    return wrap;
+  }
+  function calendarCard() {
+    const card = h('div', { class: 'card', id: 'cal-card' }, h('h3', {}, 'Google 日曆'));
+    if (!calNative()) { card.append(h('p', { class: 'muted' }, '只有桌面版 APP 可以讀 Google 日曆。')); return card; }
+    const body = h('div'); card.append(body);
+    const draw = async () => {
+      const names = await window.leiyiNative.calendar.list();
+      const name = h('input', { type: 'text', id: 'cal-name', placeholder: '名稱，例如：Connie', maxlength: 30 });
+      const url = h('input', { type: 'password', id: 'cal-url', placeholder: '貼上 iCal 格式的私人網址', autocomplete: 'off' });
+      body.replaceChildren(
+        h('p', { class: 'muted' }, '取得網址：電腦版 Google 日曆 → 右上齒輪「設定」→ 左邊點你的日曆 → 往下找「整合日曆」→「iCal 格式的私人網址」按複製。網址只會加密存在這台電腦。'),
+        names.length ? h('ul', { class: 'mini', id: 'cal-list' }, names.map((c) => h('li', {}, `📅 ${c.name}`, h('button', { class: 'btn small danger', onclick: () => lock(async () => {
+          if (!window.confirm(`移除「${c.name}」？（不會影響 Google 日曆本身）`)) return;
+          await window.leiyiNative.calendar.remove(c.index); cal.loadedAt = 0; delete calCache()[c.name]; await Store.save(); draw();
+        }) }, '移除')))) : h('p', {}, '還沒有接任何日曆。'),
+        h('div', { class: 'row wrap' }, name, url, h('button', { class: 'btn primary', id: 'btn-cal-add', onclick: () => lock(async () => {
+          const u = url.value.trim(); if (!u) throw new UserError('請貼上日曆網址');
+          try { await window.leiyiNative.calendar.add(name.value.trim() || '我的日曆', u); } catch (e) { throw new UserError(String(e.message || e).replace(/^.*Error: /, '')); }
+          await loadCalendars(true);
+          toast(cal.errors.length ? cal.errors[0] : '已接上 Google 日曆', !!cal.errors.length); draw();
+        }) }, '加入')));
+    };
+    guard(draw);
+    return card;
+  }
+
   function placeholderPage(m) { return h('div', { class: 'card' }, h('p', {}, '這個格子已預留，之後串接。'), h('p', { class: 'muted' }, m.desc || '')); }
   function rulesPage() { return h('div', { class: 'cards' }, L.RULES(cfg()).map(([t, items]) => h('div', { class: 'card' }, h('h3', {}, t), h('ul', {}, items.map((x) => h('li', {}, x)))))); }
   function toolsPage() {
@@ -556,7 +657,7 @@
           Store.data = window.LeiyiStore.normalize({ modules: {} });
           await Store.save(); go('home');
         }) }, '清空全部資料')));
-    return h('div', { class: 'cards one' }, notionCard(), basic, lists, data);
+    return h('div', { class: 'cards one' }, notionCard(), calendarCard(), basic, lists, data);
   }
 
   // ---------- 啟動 ----------
@@ -586,6 +687,10 @@
     Store.onChange = () => SY.schedulePush();
     render();
     if (cfg().mode === 'notion') { SY.startAuto(); SY.syncNow(); }
+    if (calNative()) {
+      const refreshCal = () => loadCalendars(true).then(() => { if (['home', 'calendar'].includes(state.route) && !document.querySelector('.drawer-bg') && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) render(); }).catch((e) => console.error(e));
+      refreshCal(); setInterval(refreshCal, 15 * 60 * 1000);
+    }
     window.addEventListener('online', () => SY.syncNow());
   }
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.querySelector('.drawer-bg')) go(state.route); });

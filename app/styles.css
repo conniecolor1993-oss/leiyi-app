@@ -127,3 +127,17 @@ body.busy { cursor: progress; } body.busy .drawer-foot .btn { opacity: .6; point
 .bad { color:#c0392b; }
 .side-foot .upd { display:block; width:100%; margin-top:8px; }
 .side-foot .ver { font-size:11px; margin-top:6px; opacity:.7; }
+
+/* 行程 */
+.days { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+.day { background:#fff; border:1px solid #e5e8ee; border-radius:10px; padding:10px 12px; }
+.day.today { border-color:#2f6fdf; box-shadow:0 0 0 2px rgba(47,111,223,.15); }
+.day.empty { opacity:.65; }
+.day-h { font-weight:600; margin-bottom:6px; }
+.evs { list-style:none; margin:0; padding:0; }
+.ev { display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; padding:4px 0; border-top:1px dashed #eef0f4; }
+.ev:first-child { border-top:0; }
+.ev-t { font-variant-numeric:tabular-nums; color:#2f6fdf; min-width:92px; font-size:13px; }
+.ev-n { font-weight:500; }
+.small { font-size:12px; }
+.chip.small { font-size:11px; padding:1px 6px; }

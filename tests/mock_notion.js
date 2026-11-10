@@ -117,6 +117,13 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     const body = raw ? JSON.parse(raw) : {};
     const send = (status, obj, headers) => { res.writeHead(status, Object.assign({ 'Content-Type': 'application/json' }, headers || {})); res.end(JSON.stringify(obj)); };
+    if (req.url.startsWith('/cal/')) { // 假 Google 日曆（iCal）
+      if (ctl.calDown) { res.writeHead(404); return res.end('gone'); }
+      const p2 = (n) => String(n).padStart(2, '0'); const d = new Date(); const t = `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}`;
+      const ics = ['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:t1', `DTSTART;TZID=Asia/Taipei:${t}T090000`, `DTEND;TZID=Asia/Taipei:${t}T100000`, 'SUMMARY:今天的測試會議', 'LOCATION:雷翼辦公室', 'END:VEVENT',
+        'BEGIN:VEVENT', 'UID:t2', `DTSTART;VALUE=DATE:${t}`, 'RRULE:FREQ=WEEKLY', 'SUMMARY:每週例行', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+      res.writeHead(200, { 'Content-Type': 'text/calendar; charset=utf-8' }); return res.end(ics);
+    }
     if (req.url.startsWith('/__ctl/')) {
       if (req.url === '/__ctl/state') return send(200, { db, ctl });
       if (req.url === '/__ctl/set') { Object.assign(ctl, body); return send(200, ctl); }

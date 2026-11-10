@@ -18,6 +18,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: node tests/unit.test.js
+      - run: node tests/ical.test.js
       - run: npx electron-builder --win nsis --x64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

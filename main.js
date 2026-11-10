@@ -91,6 +91,41 @@ ipcMain.handle('notion:request', async (_e, method, p, body) => {
     return { status: r.status, retryAfter: r.headers.get('retry-after'), json };
   } catch (e) { return { status: 0, json: { message: String(e.message || e) } }; }
 });
+// ---------- Google 日曆（iCal 私人網址，加密存在這台電腦，畫面拿不到網址） ----------
+const calFile = () => path.join(app.getPath('userData'), 'calendars.bin');
+const CAL_OK = (u) => /^https:\/\/calendar\.google\.com\/calendar\/ical\/[^\s]+\.ics$/i.test(u) || (process.env.LEIYI_ICAL_ALLOW && String(u).startsWith(process.env.LEIYI_ICAL_ALLOW));
+function readCals() {
+  try {
+    const buf = fs.readFileSync(calFile());
+    const txt = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : buf.toString('utf8');
+    const arr = JSON.parse(txt); return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function writeCals(arr) {
+  const txt = JSON.stringify(arr);
+  fs.mkdirSync(path.dirname(calFile()), { recursive: true });
+  fs.writeFileSync(calFile(), safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(txt) : Buffer.from(txt, 'utf8'));
+}
+ipcMain.handle('cal:list', () => readCals().map((c, i) => ({ index: i, name: c.name })));
+ipcMain.handle('cal:add', (_e, name, url) => {
+  const u = String(url || '').trim(); const n = String(name || '').trim().slice(0, 30) || '我的日曆';
+  if (!CAL_OK(u)) throw new Error('網址不對：要用 Google 日曆設定裡「iCal 格式的私人網址」，開頭是 https://calendar.google.com/calendar/ical/ ，結尾是 .ics');
+  const arr = readCals(); if (arr.some((c) => c.url === u)) throw new Error('這個日曆已經加過了');
+  arr.push({ name: n, url: u }); writeCals(arr); return true;
+});
+ipcMain.handle('cal:remove', (_e, i) => { const arr = readCals(); arr.splice(Number(i), 1); writeCals(arr); return true; });
+ipcMain.handle('cal:fetch', async () => {
+  const out = [];
+  for (const c of readCals()) {
+    try {
+      const ctrl = new AbortController(); const to = setTimeout(() => ctrl.abort(), 20000);
+      const r = await net.fetch(c.url, { signal: ctrl.signal }); clearTimeout(to);
+      out.push(r.ok ? { name: c.name, text: await r.text() } : { name: c.name, error: r.status === 404 ? '網址失效（可能在 Google 重設過私人網址）' : `讀取失敗（${r.status}）` });
+    } catch (e) { out.push({ name: c.name, error: '連不上 Google 日曆（可能沒有網路）', offline: true }); }
+  }
+  return out;
+});
+
 // 切換同步模式前自動備份一份
 ipcMain.handle('data:autoBackup', (_e, data) => {
   const dir = path.join(app.getPath('userData'), 'backups'); fs.mkdirSync(dir, { recursive: true });

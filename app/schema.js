@@ -200,7 +200,7 @@ window.UserError = UserError;
         { key: '資料來源', type: 'text' }
       ]
     },
-    { id: 'calendar', group: '專案行程', title: '行程', icon: '📅', kind: 'placeholder', desc: '之後接 Google 行事曆（行程只記在行事曆，這裡只讀）。' },
+    { id: 'calendar', group: '專案行程', title: '行程', icon: '📅', kind: 'calendar', desc: '直接讀 Google 日曆（只讀）。要新增或修改行程，按「在 Google 日曆新增」。' },
 
     // ---------- 研究評估 RES ----------
     {

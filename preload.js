@@ -12,6 +12,12 @@ contextBridge.exposeInMainWorld('leiyiNative', {
     install: () => ipcRenderer.invoke('update:install'),
     onStatus: (fn) => ipcRenderer.on('update:status', (_e, s) => fn(s))
   },
+  calendar: {
+    list: () => ipcRenderer.invoke('cal:list'),
+    add: (name, url) => ipcRenderer.invoke('cal:add', name, url),
+    remove: (i) => ipcRenderer.invoke('cal:remove', i),
+    fetch: () => ipcRenderer.invoke('cal:fetch')
+  },
   autoBackup: (data) => ipcRenderer.invoke('data:autoBackup', data),
   notion: {
     setToken: (t) => ipcRenderer.invoke('notion:setToken', t),
