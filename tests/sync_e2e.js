@@ -225,6 +225,20 @@ const newRec = async (mod) => { await nav(mod); await pg.click('#btn-new'); awai
     await nav('settings'); await pg.click('#cal-list button'); await sleep(300); await pg.click('#cal-list button'); await sleep(300);
     check('移除日曆', (await pg.locator('#cal-list').count()) === 0);
 
+    // ---- 檢查更新按鈕 ----
+    check('左下角有版本與檢查更新鈕', (await pg.locator('.upd-box').innerText()).includes('版本') && (await pg.locator('#btn-update').innerText()).includes('檢查更新'));
+    await pg.click('#btn-update'); await sleep(300);
+    check('按檢查更新會顯示結果', (await pg.locator('#btn-update').innerText()).includes('已是最新版'));
+    await S(() => { window.__u = 1; }); // 模擬下載進度事件不會重畫整頁
+    await nav('settings'); await pg.fill('#cal-card .cal-name', '打字中');
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('update:status', { state: 'downloading', version: '9.9.9', percent: 42 }));
+    await sleep(200);
+    check('下載中顯示進度', (await pg.locator('.upd-box').innerText()).includes('42%'));
+    check('進度更新不會清掉正在打的字', (await pg.inputValue('#cal-card .cal-name')) === '打字中');
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('update:status', { state: 'ready', version: '9.9.9', percent: 100 }));
+    await sleep(200);
+    check('下載好顯示更新鈕', (await pg.locator('#btn-update').innerText()).includes('9.9.9 已下載'));
+
     // ---- 中斷連線 ----
     await nav('settings'); await pg.click('#btn-notion-off'); await sleep(300);
     check('中斷後回本機模式', (await S(() => window.LeiyiStore.Store.data.settings.mode)) === 'local');

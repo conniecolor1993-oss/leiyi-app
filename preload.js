@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('leiyiNative', {
   update: {
     status: () => ipcRenderer.invoke('update:status'),
     install: () => ipcRenderer.invoke('update:install'),
+    check: () => ipcRenderer.invoke('update:check'),
     onStatus: (fn) => ipcRenderer.on('update:status', (_e, s) => fn(s))
   },
   calendar: {

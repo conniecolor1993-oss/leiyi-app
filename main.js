@@ -136,7 +136,9 @@ ipcMain.handle('data:autoBackup', (_e, data) => {
 });
 
 // ---------- 自動更新（從 GitHub 下載新版，下載完提醒重新啟動） ----------
-const update = { state: 'idle', version: '' };
+// 狀態：idle 沒動作／checking 檢查中／none 已是最新／downloading 下載中（percent）／ready 可安裝／error 失敗
+const update = { state: 'idle', version: '', percent: 0, message: '' };
+let checkNow = async () => { update.state = 'none'; return update; };
 function setupUpdater(win) {
   if (!app.isPackaged || process.env.LEIYI_NO_UPDATE) return;
   let autoUpdater;
@@ -144,14 +146,23 @@ function setupUpdater(win) {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   const send = () => { if (!win.isDestroyed()) win.webContents.send('update:status', update); };
-  autoUpdater.on('update-available', (i) => { update.state = 'downloading'; update.version = i.version; send(); });
-  autoUpdater.on('update-downloaded', (i) => { update.state = 'ready'; update.version = i.version; send(); });
-  autoUpdater.on('error', () => { update.state = 'idle'; }); // 沒網路或 GitHub 連不上就下次再檢查
-  const check = () => autoUpdater.checkForUpdates().catch(() => {});
-  setTimeout(check, 5000);
-  setInterval(check, 6 * 60 * 60 * 1000);
+  const set = (o) => { Object.assign(update, o); send(); };
+  autoUpdater.on('checking-for-update', () => { if (update.state !== 'downloading' && update.state !== 'ready') set({ state: 'checking' }); });
+  autoUpdater.on('update-not-available', () => set({ state: 'none' }));
+  autoUpdater.on('update-available', (i) => set({ state: 'downloading', version: i.version, percent: 0 }));
+  autoUpdater.on('download-progress', (p) => set({ state: 'downloading', percent: Math.round(p.percent || 0) }));
+  autoUpdater.on('update-downloaded', (i) => set({ state: 'ready', version: i.version, percent: 100 }));
+  autoUpdater.on('error', () => set({ state: 'error', message: '連不上更新伺服器，稍後再試' }));
+  checkNow = async () => {
+    if (update.state === 'downloading' || update.state === 'ready') return update;
+    try { await autoUpdater.checkForUpdates(); } catch (e) { set({ state: 'error', message: '連不上更新伺服器，稍後再試' }); }
+    return update;
+  };
+  setTimeout(checkNow, 5000);
+  setInterval(checkNow, 30 * 60 * 1000); // 每 30 分鐘自動檢查一次
   ipcMain.handle('update:install', () => { if (update.state === 'ready') autoUpdater.quitAndInstall(true, true); return true; });
 }
+ipcMain.handle('update:check', () => checkNow());
 ipcMain.handle('update:status', () => update);
 ipcMain.handle('app:version', () => app.getVersion());
 

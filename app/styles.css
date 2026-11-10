@@ -148,3 +148,7 @@ body.busy { cursor: progress; } body.busy .drawer-foot .btn { opacity: .6; point
 .ev-dot { display:inline-block; width:9px; height:9px; border-radius:50%; flex:none; align-self:center; }
 .cal-add input.cal-name { max-width:240px; }
 .cal-add input.cal-url { flex:1; min-width:240px; }
+.upd-box { margin-top:8px; }
+.upd-bar .bar { height:5px; background:rgba(255,255,255,.15); border-radius:3px; overflow:hidden; margin-top:4px; }
+.upd-bar .bar i { display:block; height:100%; background:#4caf50; }
+.side-foot .upd { white-space:normal; text-align:left; }

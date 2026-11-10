@@ -119,8 +119,7 @@
           h('span', { class: 'ico' }, m.icon), h('span', { class: 'lbl' }, m.title),
           counts[m.id] ? h('span', { class: 'badge' }, counts[m.id]) : null)))),
       h('div', { class: 'side-foot' }, `使用者：${cfg().currentUser || '未設定'}`,
-        upd.state === 'ready' ? h('button', { class: 'btn primary small upd', id: 'btn-update', onclick: () => { if (window.confirm(`新版 ${upd.version} 已下載好，現在重新啟動更新嗎？（資料不會受影響）`)) window.leiyiNative.update.install(); } }, `⬆ 有新版 ${upd.version}，按這裡更新`) : null,
-        appVer ? h('div', { class: 'muted ver' }, `版本 ${appVer}`) : null,
+        updateBox(),
         cfg().mode === 'notion' ? h('button', { class: 'sync-st ' + SY.status.state, id: 'sync-status', title: SY.status.message, onclick: () => go('settings') }, syncLabel()) : null)
     );
   }
@@ -688,6 +687,23 @@
 
   // ---------- 啟動 ----------
   let upd = { state: 'idle' }; let appVer = '';
+  // 左下角：版本＋「檢查更新」按鈕＋下載進度
+  function updateBox() {
+    if (!appVer) return null;
+    const btn = (label, fn, cls) => h('button', { class: 'btn small upd ' + (cls || ''), id: 'btn-update', onclick: fn }, label);
+    const refresh = () => { const old = document.querySelector('.upd-box'); const nu = updateBox(); if (old && nu) old.replaceWith(nu); };
+    const check = () => guard(async () => { upd = Object.assign({}, upd, { state: 'checking' }); refresh(); upd = await window.leiyiNative.update.check(); refresh(); });
+    let el;
+    switch (upd.state) {
+      case 'ready': el = btn(`⬆ 新版 ${upd.version} 已下載，按這裡更新`, () => { if (window.confirm(`現在更新到 ${upd.version}？APP 會自動重開，資料不受影響。`)) window.leiyiNative.update.install(); }, 'primary'); break;
+      case 'downloading': el = h('div', { class: 'upd-bar' }, h('div', { class: 'muted small' }, `下載新版 ${upd.version || ''}… ${upd.percent || 0}%`), h('div', { class: 'bar' }, h('i', { style: `width:${upd.percent || 0}%` }))); break;
+      case 'checking': el = h('div', { class: 'muted small' }, '檢查更新中…'); break;
+      case 'none': el = btn('✓ 已是最新版（再檢查一次）', check); break;
+      case 'error': el = btn(`⟳ 檢查更新（${upd.message || '上次失敗'}）`, check); break;
+      default: el = btn('⟳ 檢查更新', check);
+    }
+    return h('div', { class: 'upd-box' }, el, h('div', { class: 'muted ver' }, `版本 ${appVer}`));
+  }
   // 同步完成後更新畫面（正在編輯時不打斷，只更新左下角狀態）
   let lastSeen = '';
   function onSync(st) {
@@ -707,7 +723,7 @@
     if (window.leiyiNative && window.leiyiNative.update) {
       appVer = await window.leiyiNative.version();
       upd = await window.leiyiNative.update.status();
-      window.leiyiNative.update.onStatus((s) => { upd = s; if (!document.querySelector('.drawer-bg')) render(); });
+      window.leiyiNative.update.onStatus((s) => { upd = s; const old = document.querySelector('.upd-box'); const nu = updateBox(); if (old && nu) old.replaceWith(nu); });
     }
     SY.onRemap = (oldId, newId) => { if (state.open === oldId) { state.open = newId; history.replaceState(null, '', `#/${state.route}/${newId}`); } };
     Store.onChange = () => SY.schedulePush();
