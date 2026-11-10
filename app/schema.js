@@ -113,7 +113,7 @@ window.UserError = UserError;
         { key: '需確認的事', type: 'text', required: true, list: true },
         ...common('SEC'),
         { key: '權限等級', type: 'select', options: ['L2', 'L3'], default: 'L3', list: true, filter: true, hint: 'L2＝已經先做了，請你看過；L3＝還沒做，等你點頭' },
-        { key: '決定', type: 'select', options: ['同意', '不同意', '修改後同意'], list: true, hint: '同意＝照做（帳務會自動勾已確認）；不同意＝不做；修改後同意＝你改過內容後照做。選好按儲存，這筆就會完成' },
+        { key: '決定', type: 'select', options: ['同意', '不同意', '修改後同意'], list: true, hint: '同意＝照做（帳務會自動勾已確認）；不同意＝不做；修改後同意＝你改過內容後照做。第一次選好按儲存，狀態會自動變「完成」；之後要改狀態可以自己選' },
         { key: '關聯紀錄', type: 'link', list: true },
         { key: '等待天數', type: 'formula', fn: (r) => F.daysSince(r._created), list: true },
         { key: '說明', type: 'longtext' }

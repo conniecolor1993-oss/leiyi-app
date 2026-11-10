@@ -85,6 +85,15 @@ with sync_playwright() as p:
     check('不同意後只改其他欄位，不再重複要求確認', len([x for x in rows(pg, 'pending') if x.get('關聯紀錄') == f'ledger:{lid}']) == 1)
     fld(pg, '未稅金額').fill('15000'); pg.click('#btn-save'); pg.wait_for_timeout(200)
     check('金額改了會再要求確認一次', len([x for x in rows(pg, 'pending') if x.get('關聯紀錄') == f'ledger:{lid}']) == 2)
+    # 待確認：已經有決定的，之後自己改狀態不會跳回完成
+    pd = rows(pg, 'pending'); pid = pd[0]['_id']
+    nav(pg, 'pending'); pg.click(f'tr[data-id="{pid}"]'); fld(pg, '狀態', 'select').select_option('進行中'); pg.click('#btn-save'); pg.wait_for_timeout(200); pg.keyboard.press('Escape')
+    check('已有決定的待確認，自己改狀態不會被改回完成', [x for x in rows(pg, 'pending') if x['_id'] == pid][0]['狀態'] == '進行中')
+    pg.click(f'tr[data-id="{pid}"]'); fld(pg, '決定', 'select').select_option('同意'); pg.click('#btn-save'); pg.wait_for_timeout(200); pg.keyboard.press('Escape')
+    check('換一個決定、狀態沒動時才自動完成', [x for x in rows(pg, 'pending') if x['_id'] == pid][0]['狀態'] == '完成')
+    p2 = [x for x in rows(pg, 'pending') if x['_id'] != pid and not x.get('決定')][0]['_id']
+    pg.click(f'tr[data-id="{p2}"]'); fld(pg, '決定', 'select').select_option('不同意'); fld(pg, '狀態', 'select').select_option('進行中'); pg.click('#btn-save'); pg.wait_for_timeout(200); pg.keyboard.press('Escape')
+    check('選決定時同時選了狀態，就照你選的', [x for x in rows(pg, 'pending') if x['_id'] == p2][0]['狀態'] == '進行中')
     ctx.close()
 
     # --- 3. 處理紀錄日期用本地時間（台北 01:30） ---

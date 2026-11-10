@@ -135,7 +135,8 @@
     }
   }
 
-  async function afterSave(m, r) {
+  async function afterSave(m, r, before) {
+    before = before || {};
     if (m.id === 'ledger') {
       const l = link('ledger', r);
       const open = openPendingFor(l);
@@ -155,7 +156,8 @@
         await Store.upsert(mod('pending'), open, '系統');
       }
     }
-    if (m.id === 'pending' && r.決定 && !['完成', '封存'].includes(r.狀態)) {
+    // 待確認：只有「這次才選了決定」時才處理；狀態你自己改過的就照你的，不再自動跳回完成
+    if (m.id === 'pending' && r.決定 && r.決定 !== before.決定) {
       const t = resolve(r.關聯紀錄);
       if (t && t.mod.id === 'ledger' && (r.決定 === '同意' || r.決定 === '修改後同意') && !t.rec.已確認) {
         t.rec.已確認 = true; delete t.rec._rejected; await Store.upsert(t.mod, t.rec, '系統');
@@ -163,7 +165,8 @@
       if (t && t.mod.id === 'ledger' && r.決定 === '不同意') {
         t.rec._rejected = `${t.rec.收支}|${F.含稅金額(t.rec)}`; await Store.upsert(t.mod, t.rec, '系統');
       }
-      r.狀態 = '完成'; await Store.upsert(m, r, '系統');
+      const statusUntouched = (r.狀態 || '') === (before.狀態 || '');
+      if (statusUntouched && !['完成', '封存'].includes(r.狀態)) { r.狀態 = '完成'; await Store.upsert(m, r, '系統'); }
     }
     if (m.id === 'evaluations') {
       for (const idea of Store.list('ideas')) {
@@ -177,8 +180,10 @@
 
   async function save(m, r) {
     beforeSave(m, r);
+    const prev = r._id ? Store.get(m.id, r._id) : null;
+    const before = prev ? { 決定: prev.決定 || '', 狀態: prev.狀態 || '' } : { 決定: '', 狀態: '' };
     const saved = await Store.upsert(m, r, actor());
-    await afterSave(m, saved);
+    await afterSave(m, saved, before);
     return saved;
   }
 
