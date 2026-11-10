@@ -114,6 +114,12 @@ ipcMain.handle('cal:add', (_e, name, url) => {
   if (arr.some((c) => c.name === n)) throw new Error(`已經有叫「${n}」的分類了，換個名稱`);
   arr.push({ name: n, url: u }); writeCals(arr); return true;
 });
+ipcMain.handle('cal:rename', (_e, i, name) => {
+  const n = String(name || '').trim().slice(0, 30); if (!n) throw new Error('名稱不能空白');
+  const arr = readCals(); if (!arr[i]) throw new Error('找不到這個分類');
+  if (arr.some((c, j) => j !== Number(i) && c.name === n)) throw new Error(`已經有叫「${n}」的分類了`);
+  arr[i].name = n; writeCals(arr); return true;
+});
 ipcMain.handle('cal:remove', (_e, i) => { const arr = readCals(); arr.splice(Number(i), 1); writeCals(arr); return true; });
 ipcMain.handle('cal:fetch', async () => {
   const out = [];

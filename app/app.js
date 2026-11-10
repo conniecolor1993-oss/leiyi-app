@@ -492,7 +492,8 @@
           h('button', { class: 'cchip' + (calPick() ? '' : ' on'), onclick: () => guard(async () => { cfg().calPick = ''; await Store.save(); draw(); }) }, '全部'),
           calNames().map((n) => h('button', { class: 'cchip' + (calPick() === n ? ' on' : ''), 'data-cal': n, onclick: () => guard(async () => { cfg().calPick = n; await Store.save(); draw(); }) },
             h('span', { class: 'ev-dot', style: `background:${calColor(n)}` }), n)),
-          h('button', { class: 'cchip add', id: 'btn-cal-new', onclick: () => { addOpen = !addOpen; draw(); } }, addOpen ? '× 取消' : '＋ 新增分類')),
+          h('button', { class: 'cchip add', id: 'btn-cal-new', onclick: () => { addOpen = !addOpen; draw(); } }, addOpen ? '× 取消' : '＋ 新增分類'),
+          h('button', { class: 'cchip add', onclick: () => go('settings') }, '✎ 改名／移除')),
         addOpen ? h('div', { class: 'card' }, h('p', { class: 'muted' }, '到 Google 日曆「設定」→ 左邊點那個日曆 →「整合日曆」→ 複製「非公開網址 (iCal 格式)」。名稱填跟 Google 日曆一樣的名字。'), calAddForm(() => { addOpen = false; draw(); })) : null,
         cal.errors.length ? h('div', { class: 'alert' }, cal.errors.join('；'), '（先顯示上次讀到的行程）') : null,
         h('p', { class: 'muted' }, `${IC.ymd(from)} 起兩週，共 ${evs.length} 個行程${cal.loadedAt ? `｜更新於 ${new Date(cal.loadedAt).toLocaleTimeString('zh-TW', { hour12: false })}` : ''}`),
@@ -510,7 +511,21 @@
       const names = await window.leiyiNative.calendar.list();
       body.replaceChildren(
         h('p', { class: 'muted' }, '每個 Google 日曆是一個分類，要分別加入。取得網址：電腦版 Google 日曆 → 右上齒輪「設定」→ 左邊點那個日曆 →「整合日曆」→ 複製「非公開網址 (iCal 格式)」。名稱填跟 Google 日曆一樣的名字（例如：打工）。網址只會加密存在這台電腦。'),
-        names.length ? h('ul', { class: 'mini', id: 'cal-list' }, names.map((c) => h('li', {}, h('span', {}, h('span', { class: 'ev-dot', style: `background:${calColor(c.name)}` }), c.name), h('button', { class: 'btn small danger', onclick: () => lock(async () => {
+        names.length ? h('ul', { class: 'mini', id: 'cal-list' }, names.map((c) => h('li', { 'data-cal-row': c.name }, h('span', {}, h('span', { class: 'ev-dot', style: `background:${calColor(c.name)}` }), c.name),
+          h('button', { class: 'btn small cal-rename', onclick: (ev) => {
+            const li = ev.target.closest('li');
+            const inp = h('input', { type: 'text', value: c.name, maxlength: 30, class: 'cal-newname' });
+            li.replaceChildren(inp, h('button', { class: 'btn small primary cal-rename-ok', onclick: () => lock(async () => {
+              const n = inp.value.trim(); if (!n) throw new UserError('名稱不能空白');
+              if (n === c.name) { draw(); return; }
+              try { await window.leiyiNative.calendar.rename(c.index, n); } catch (e) { throw new UserError(String(e.message || e).replace(/^.*Error: /, '')); }
+              const cache = calCache(); if (cache[c.name]) { cache[n] = cache[c.name]; delete cache[c.name]; }
+              if (cfg().calPick === c.name) cfg().calPick = n;
+              cal.list = cal.list.map((x) => (x.name === c.name ? Object.assign({}, x, { name: n }) : x));
+              await Store.save(); toast(`已改名為「${n}」`); draw();
+            }) }, '儲存'), h('button', { class: 'btn small', onclick: () => draw() }, '取消'));
+            inp.focus(); inp.select();
+          } }, '改名'), h('button', { class: 'btn small danger', onclick: () => lock(async () => {
           if (!window.confirm(`移除「${c.name}」？（不會影響 Google 日曆本身）`)) return;
           await window.leiyiNative.calendar.remove(c.index); cal.loadedAt = 0; delete calCache()[c.name]; await Store.save(); draw();
         }) }, '移除')))) : h('p', {}, '還沒有接任何日曆。'),

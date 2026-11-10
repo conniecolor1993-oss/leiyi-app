@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('leiyiNative', {
     list: () => ipcRenderer.invoke('cal:list'),
     add: (name, url) => ipcRenderer.invoke('cal:add', name, url),
     remove: (i) => ipcRenderer.invoke('cal:remove', i),
+    rename: (i, name) => ipcRenderer.invoke('cal:rename', i, name),
     fetch: () => ipcRenderer.invoke('cal:fetch')
   },
   autoBackup: (data) => ipcRenderer.invoke('data:autoBackup', data),

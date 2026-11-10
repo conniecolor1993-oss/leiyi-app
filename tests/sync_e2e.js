@@ -222,7 +222,13 @@ const newRec = async (mod) => { await nav(mod); await pg.click('#btn-new'); awai
     await ctl('set', { calDown: true }); await nav('calendar'); await pg.click('#btn-cal-refresh'); await sleep(500);
     check('日曆失效時顯示原因並保留上次行程', (await pg.locator('.alert').innerText()).includes('網址失效') && (await pg.locator('.days').innerText()).includes('今天的測試會議'));
     await ctl('set', { calDown: false });
-    await nav('settings'); await pg.click('#cal-list button'); await sleep(300); await pg.click('#cal-list button'); await sleep(300);
+    await nav('settings'); await pg.click('[data-cal-row="Connie"] .cal-rename'); await pg.fill('.cal-newname', '打工'); await pg.click('.cal-rename-ok'); await sleep(200);
+    check('改名不能跟別的分類重複', /已經有叫「打工」/.test(await lastToast()), await lastToast());
+    await pg.fill('.cal-newname', '浪費了時間'); await pg.click('.cal-rename-ok'); await sleep(300);
+    check('分類可以改名', (await pg.locator('#cal-list').innerText()).includes('浪費了時間') && !(await pg.locator('#cal-list').innerText()).includes('Connie'));
+    await nav('calendar'); await sleep(300);
+    check('改名後行程頁分類跟著改、行程還在', (await pg.locator('.cal-chips').innerText()).includes('浪費了時間') && ((await pg.locator('.days').innerText()).match(/今天的測試會議/g) || []).length === 2);
+    await nav('settings'); await pg.click('#cal-list .danger'); await sleep(300); await pg.click('#cal-list .danger'); await sleep(300);
     check('移除日曆', (await pg.locator('#cal-list').count()) === 0);
 
     // ---- 檢查更新按鈕 ----
