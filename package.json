@@ -1,0 +1,70 @@
+{
+  "name": "leiyi-company-app",
+  "productName": "雷翼公司APP",
+  "version": "1.2.0",
+  "description": "公司後勤 APP：左側目錄、右側操作，Notion 同步，可自動更新",
+  "main": "main.js",
+  "author": "雷翼行銷有限公司",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:mac": "electron-builder --mac dmg",
+    "test": "node tests/unit.test.js && xvfb-run -a node tests/sync_e2e.js",
+    "release:win": "electron-builder --win nsis --x64 --publish always"
+  },
+  "build": {
+    "appId": "com.leiyi.companyapp",
+    "productName": "雷翼公司APP",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "LeiyiApp-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "雷翼公司APP",
+      "createDesktopShortcut": "always",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.business"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "conniecolor1993-oss",
+        "repo": "leiyi-app",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}

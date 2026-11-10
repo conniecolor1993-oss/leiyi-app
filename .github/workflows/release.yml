@@ -1,0 +1,21 @@
+# 推上 v 開頭的版本標籤（例如 v1.2.0）時，在 Windows 機器上打包安裝檔並發佈到 GitHub Releases
+# 已安裝的 APP 會從這裡自動下載新版
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: node tests/unit.test.js
+      - run: npx electron-builder --win nsis --x64 --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
