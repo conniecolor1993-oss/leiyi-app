@@ -10,6 +10,11 @@
   const $ = (sel, root = document) => root.querySelector(sel);
 
   // ---------- 小工具 ----------
+  // 畫面元件只要遇到「沒有東西」(null/undefined/false) 就略過，不會變成「null」字樣
+  for (const k of ['append', 'replaceChildren', 'prepend']) {
+    const orig = Element.prototype[k];
+    Element.prototype[k] = function (...xs) { return orig.apply(this, xs.filter((x) => x !== null && x !== undefined && x !== false)); };
+  }
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs || {})) {

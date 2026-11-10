@@ -205,6 +205,7 @@ const newRec = async (mod) => { await nav(mod); await pg.click('#btn-new'); awai
     check('每週重複行程出現兩次（兩週）', (calText.match(/每週例行/g) || []).length === 2);
     await nav('home'); await sleep(200);
     check('首頁顯示今天行程', (await pg.locator('#today-cal').innerText()).includes('今天的測試會議'));
+    for (const r of ['home', 'calendar', 'settings', 'tasks', 'projects', 'ledger', 'inbox', 'pending']) { await nav(r); await sleep(250); const t = await pg.locator('main').innerText(); check(`${r} 頁沒有 null/undefined 字樣`, !/\bnull\b|\bundefined\b|NaN/.test(t), t.match(/.{0,20}(null|undefined|NaN).{0,20}/)); }
     await ctl('set', { calDown: true }); await nav('calendar'); await pg.click('#btn-cal-refresh'); await sleep(500);
     check('日曆失效時顯示原因並保留上次行程', (await pg.locator('.alert').innerText()).includes('網址失效') && (await pg.locator('.days').innerText()).includes('今天的測試會議'));
     await ctl('set', { calDown: false });
