@@ -18,7 +18,7 @@ window.UserError = UserError;
     L1: '自己處理，不用問', L2: '先做，做完告訴你', L3: '要你先同意才做',
     封存: '收起來不顯示，不會刪除', 待核對: '內容還要確認', 暫緩: '先放著', 觀望: '先不決定，再看看',
     修改後同意: '你改過內容後照做', 待分析: '還沒整理', n8n: '自動化流程', 排程自動: '定時自動跑的', 系統自動: 'APP 自動產生',
-    電子發票: '雲端發票，可上網查', 紙本三聯式: '有寫統編，可以抵稅', 紙本二聯式: '沒寫統編，不能抵稅', 無憑證: '沒有任何單據',
+    電子發票: '雲端發票，可上網查', 紙本三聯式: '有寫統編，可以抵稅', 紙本二聯式: '沒寫統編，不能抵稅', 勞務報酬單: '付給個人的勞務費', 無憑證: '沒有任何單據',
     老闆區: '只有老闆看得到', 團隊區: '大家都看得到'
   };
   // 欄位的白話說明（欄位本身沒寫說明時使用）
@@ -144,7 +144,7 @@ window.UserError = UserError;
         { key: '未稅金額', type: 'money' },
         { key: '稅額', type: 'money', helper: 'tax5' },
         { key: '含稅金額', type: 'formula', fn: F.含稅金額, format: 'money', list: true },
-        { key: '憑證類型', type: 'select', options: ['電子發票', '紙本三聯式', '紙本二聯式', '收據', '無憑證'] },
+        { key: '憑證類型', type: 'select', options: ['電子發票', '紙本三聯式', '紙本二聯式', '收據', '勞務報酬單', '無憑證'] },
         { key: '發票號碼', type: 'text' },
         { key: '對方名稱', type: 'text' },
         { key: '對方統編', type: 'text' },
@@ -156,6 +156,7 @@ window.UserError = UserError;
         { key: '專案', type: 'relation', module: 'projects' },
         { key: '憑證連結', type: 'url' },
         { key: '已確認', type: 'checkbox', list: true, filter: true, hint: '負責人確認後才勾' },
+        { key: '備註', type: 'longtext', hint: '待補的事、憑證說明' },
         { key: '月份鍵', type: 'formula', fn: F.月份鍵 },
         { key: '營業稅期別', type: 'formula', fn: F.營業稅期別, list: true }
       ]
