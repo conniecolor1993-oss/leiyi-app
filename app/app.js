@@ -142,7 +142,7 @@
     page.append(head);
     const body = h('section', { class: 'page-body' });
     page.append(body);
-    const view = { dashboard: dashboard, table: tablePage, tax: taxPage, placeholder: placeholderPage, calendar: calendarPage, rules: rulesPage, tools: toolsPage, settings: settingsPage }[m.kind];
+    const view = { dashboard: dashboard, table: tablePage, tax: taxPage, finance: financePage, placeholder: placeholderPage, calendar: calendarPage, rules: rulesPage, tools: toolsPage, settings: settingsPage }[m.kind];
     body.append(view(m));
     if (m.kind === 'table' && state.open) openDrawer(m, state.open === 'new' ? null : state.open);
   }
@@ -198,6 +198,7 @@
         kpi('收件匣待分派', openCount('inbox'), 'inbox'),
         kpi('進行中專案', projects.length, 'projects', big > cfg().maxBigProjects),
         kpi('停滯專案', stale.length, 'projects', stale.length > 0),
+        kpi(`今年營利（含待確認）`, money((() => { const rs = window.LeiyiFinance.monthly(Store.list('ledger'), new Date().getFullYear(), false); return rs.reduce((a, r) => a + r.net, 0); })()), 'finance'),
         kpi(`本月收入（已確認）`, money(inc), 'ledger'),
         kpi(`本月支出（已確認）`, money(exp), 'ledger'),
         kpi('帳務未確認', unconf, 'ledger', unconf > 0),
@@ -405,6 +406,89 @@
   function deadline(p) { const [y, n] = p.split('-P').map(Number); const m = Number(n) * 2 + 1; return m > 12 ? `${y + 1}-01-15` : `${y}-${String(m).padStart(2, '0')}-15`; }
 
   // ---------- 其他頁 ----------
+  // ---------- 財務總覽 ----------
+  const FN = window.LeiyiFinance;
+  const fin = { year: null, confirmed: false };
+  function financeChart(rows, pays) {
+    const W = 760, H = 260, L0 = 64, R0 = 12, T0 = 16, B0 = 34;
+    const vals = rows.flatMap((r, i) => [r.inc, r.exp, r.net, r.net - (pays[i] || 0)]);
+    let max = Math.max(1, ...vals), min = Math.min(0, ...vals);
+    const step = (() => { const raw = (max - min) / 4; const p = Math.pow(10, Math.floor(Math.log10(raw || 1))); return Math.ceil(raw / p / (raw / p > 5 ? 2 : 1)) * p * (raw / p > 5 ? 2 : 1); })();
+    max = Math.ceil(max / step) * step; min = Math.floor(min / step) * step;
+    const y = (v) => T0 + (max - v) / (max - min || 1) * (H - T0 - B0);
+    const cw = (W - L0 - R0) / 12; const bw = Math.min(16, cw / 3);
+    const NS = 'http://www.w3.org/2000/svg';
+    const el = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'fin-chart', role: 'img', 'aria-label': '每月收入、支出與營利' });
+    const short = (v) => (Math.abs(v) >= 10000 ? `${Math.round(v / 1000) / 10}萬` : `${Math.round(v)}`);
+    for (let v = min; v <= max + 0.1; v += step) {
+      svg.append(el('line', { x1: L0, x2: W - R0, y1: y(v), y2: y(v), class: v === 0 ? 'axis0' : 'grid' }));
+      svg.append(el('text', { x: L0 - 6, y: y(v) + 4, class: 'tick', 'text-anchor': 'end' }, short(v)));
+    }
+    const pts = []; const pts2 = [];
+    rows.forEach((r, i) => {
+      const cx = L0 + cw * i + cw / 2;
+      const bar = (v, x, cls, label) => { const t = el('rect', { x, y: Math.min(y(v), y(0)), width: bw, height: Math.max(1, Math.abs(y(v) - y(0))), rx: 2, class: cls }); t.append(el('title', {}, `${r.month} ${label} ${money(v)}`)); svg.append(t); };
+      bar(r.inc, cx - bw - 1, 'b-inc', '收入'); bar(r.exp, cx + 1, 'b-exp', '支出');
+      svg.append(el('text', { x: cx, y: H - 12, class: 'tick', 'text-anchor': 'middle' }, `${Number(r.month.slice(5))}月`));
+      pts.push(`${cx},${y(r.net)}`); pts2.push(`${cx},${y(r.net - (pays[i] || 0))}`);
+    });
+    svg.append(el('polyline', { points: pts.join(' '), class: 'l-net' }));
+    if (pays.some(Boolean)) svg.append(el('polyline', { points: pts2.join(' '), class: 'l-cash' }));
+    rows.forEach((r, i) => { const cx = L0 + cw * i + cw / 2; const c = el('circle', { cx, cy: y(r.net), r: 3, class: 'd-net' }); c.append(el('title', {}, `${r.month} 營利 ${money(r.net)}`)); svg.append(c); });
+    return svg;
+  }
+  function financePage() {
+    const ledger = Store.list('ledger'); const loans = Store.list('loans').filter((l) => !['封存', '已還清'].includes(l.狀態));
+    const nowY = new Date().getFullYear(); const nowM = FN.ym(new Date());
+    const years = [...new Set([nowY, ...ledger.map((r) => Number(String(r.日期 || '').slice(0, 4))).filter(Boolean)])].sort();
+    const year = fin.year || nowY;
+    const rows = FN.monthly(ledger, year, fin.confirmed);
+    const scheds = loans.map((l) => ({ loan: l, s: FN.loanSchedule(l) }));
+    const pays = rows.map((r) => scheds.reduce((a, x) => a + ((x.s.rows.find((q) => q.month === r.month) || {}).pay || 0), 0));
+    const ints = rows.map((r) => scheds.reduce((a, x) => a + ((x.s.rows.find((q) => q.month === r.month) || {}).interest || 0), 0));
+    const upto = (arr) => arr.reduce((a, v, i) => a + (year < nowY || rows[i].month <= nowM ? v : 0), 0);
+    const inc = upto(rows.map((r) => r.inc)); const exp = upto(rows.map((r) => r.exp)); const net = inc - exp;
+    const paid = upto(pays); const intPaid = upto(ints);
+    const monthlyPay = scheds.reduce((a, x) => a + (x.s.monthlyPayment || 0), 0);
+    const balance = scheds.reduce((a, x) => a + FN.balanceAt(x.loan, x.s, nowM), 0);
+    const pendingCount = ledger.filter((r) => String(r.日期 || '').startsWith(String(year)) && !r.已確認 && r.狀態 !== '封存').length;
+    const period = year < nowY ? `${year} 全年` : year === nowY ? `${year} 年 1 月到 ${Number(nowM.slice(5))} 月` : `${year}（未來）`;
+    const k = (v, l, cls, sub) => h('div', { class: 'kpi ' + (cls || '') }, h('div', { class: 'kpi-v' }, v), h('div', { class: 'kpi-l' }, l), sub ? h('div', { class: 'muted small' }, sub) : null);
+    const pct = inc ? `${Math.round(net / inc * 100)}%` : '—';
+    let cum = 0;
+    return h('div', {},
+      h('div', { class: 'toolbar' },
+        h('select', { id: 'fin-year', onchange: (e) => { fin.year = Number(e.target.value); render(); } }, years.map((y0) => h('option', { value: y0, selected: y0 === year }, `${y0} 年`))),
+        h('label', { class: 'chk' }, h('input', { type: 'checkbox', id: 'fin-confirmed', checked: fin.confirmed, onchange: (e) => { fin.confirmed = e.target.checked; render(); } }), '只算已確認的帳'),
+        h('button', { class: 'btn', onclick: () => go('ledger') }, '看帳務明細'), h('button', { class: 'btn', onclick: () => go('loans') }, '看貸款')),
+      !fin.confirmed && pendingCount ? h('div', { class: 'alert' }, `${year} 年還有 ${pendingCount} 筆帳沒確認，下面的數字先全部算進去。確認完勾「已確認」數字才準。`) : null,
+      h('p', { class: 'muted' }, `統計期間：${period}（金額未稅）`),
+      h('div', { class: 'kpis', id: 'fin-kpis' },
+        k(money(inc), '收入', 'good'), k(money(exp), '支出', 'bad'),
+        k(money(net), '營利（收入－支出）', net >= 0 ? 'good' : 'bad', `利潤率 ${pct}`),
+        loans.length ? k(money(net - paid), '扣掉貸款還款後', net - paid >= 0 ? 'good' : 'bad', `這段期間還款 ${money(paid)}（利息 ${money(intPaid)}）`) : null,
+        loans.length ? k(monthlyPay ? money(monthlyPay) : '待補資料', '貸款每月要還', '', `剩餘本金 ${money(balance)}`) : null),
+      h('div', { class: 'card' }, h('h3', {}, '每月收支'),
+        h('div', { class: 'legend' }, h('span', { class: 'lg inc' }, '收入'), h('span', { class: 'lg exp' }, '支出'), h('span', { class: 'lg net' }, '營利'), pays.some(Boolean) ? h('span', { class: 'lg cash' }, '扣還款後') : null),
+        financeChart(rows, pays)),
+      h('div', { class: 'card' }, h('h3', {}, '每月明細'),
+        h('table', { class: 'grid fin-table', id: 'fin-table' },
+          h('thead', {}, h('tr', {}, ['月份', '收入', '支出', '營利', '貸款還款', '扣還款後', '累計（扣還款後）'].map((t) => h('th', {}, t)))),
+          h('tbody', {}, rows.map((r, i) => { const after = r.net - pays[i]; cum += after; const future = year > nowY || (year === nowY && r.month > nowM);
+            return h('tr', { class: future ? 'future' : '' }, h('td', {}, `${Number(r.month.slice(5))} 月${future ? '（未來）' : ''}`), h('td', { class: 'num' }, money(r.inc)), h('td', { class: 'num' }, money(r.exp)),
+              h('td', { class: 'num ' + (r.net < 0 ? 'neg' : '') }, money(r.net)), h('td', { class: 'num' }, pays[i] ? money(pays[i]) : '—'),
+              h('td', { class: 'num ' + (after < 0 ? 'neg' : '') }, money(after)), h('td', { class: 'num ' + (cum < 0 ? 'neg' : '') }, money(cum))); })),
+          h('tfoot', {}, h('tr', {}, h('td', {}, '全年'), ...[rows.reduce((a, r) => a + r.inc, 0), rows.reduce((a, r) => a + r.exp, 0), rows.reduce((a, r) => a + r.net, 0), pays.reduce((a, v) => a + v, 0), rows.reduce((a, r, i) => a + r.net - pays[i], 0)].map((v) => h('td', { class: 'num' + (v < 0 ? ' neg' : '') }, money(v))), h('td', {}, ''))))),
+      h('div', { class: 'card', id: 'fin-loans' }, h('h3', {}, '貸款'),
+        !loans.length ? h('p', {}, '還沒有貸款資料。', h('a', { href: '#', onclick: (e) => { e.preventDefault(); go('loans', 'new'); } }, '新增一筆貸款')) :
+        h('ul', { class: 'mini' }, scheds.map(({ loan, s: sc }) => h('li', {},
+          h('a', { href: '#', onclick: (e) => { e.preventDefault(); go('loans', loan._id); } }, `🏦 ${loan.貸款名稱}${loan.銀行 ? `（${loan.銀行}）` : ''}`),
+          sc.missing.length ? h('span', { class: 'bad' }, `本金 ${money(loan.本金)}；還缺：${sc.missing.join('、')}，補好就能算每月還款`) :
+            h('span', { class: 'muted' }, `本金 ${money(loan.本金)}｜每月 ${money(sc.monthlyPayment)}｜剩餘本金 ${money(FN.balanceAt(loan, sc, nowM))}｜已還 ${sc.rows.filter((q) => q.month <= nowM).length}/${sc.rows.length} 期｜預計 ${sc.endMonth} 還清${(sc.rows.find((q) => q.warn) || {}).warn ? '｜⚠ ' + sc.rows.find((q) => q.warn).warn : ''}`))))),
+      h('p', { class: 'muted small' }, '說明：營利＝收入－支出（未稅，不含「私人」與「封存」）。貸款的本金還款不算費用，所以不影響營利，但會從手上的現金扣掉，所以另外列「扣掉貸款還款後」。薪資、勞健保要記在帳務裡才會算進支出。'));
+  }
+
   // ---------- Google 日曆（只讀） ----------
   const IC = window.LeiyiICal;
   const cal = { list: [], errors: [], loading: false, loadedAt: 0, from: null };

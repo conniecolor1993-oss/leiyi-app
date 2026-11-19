@@ -13,7 +13,7 @@
   const AUTO = {
     inbox: ['收件匣'], pending: ['待確認'], handoff: ['任務交接'], ledger: ['帳務'], projects: ['專案'],
     tasks: ['每日任務', '工作任務總表'], ideas: ['想法池'], evaluations: ['評估'], meetings: ['會議紀錄'],
-    staff: ['員工名冊'], contacts: ['聯絡人', '人脈'], logs: ['處理紀錄']
+    staff: ['員工名冊'], contacts: ['聯絡人', '人脈'], logs: ['處理紀錄'], loans: ['貸款']
   };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const mod = (id) => L.MODULES.find((m) => m.id === id);
@@ -275,6 +275,7 @@
     if (window.leiyiNative && window.leiyiNative.autoBackup) await window.leiyiNative.autoBackup(Store.data);
     const s = S();
     s.mapping = clean; s.schemas = schemas; s.queue = []; s.errors = [];
+    s.declined = tableMods().map((m) => m.id).filter((id) => !clean[id]);
     Store.data.settings.mode = 'notion';
     importOptions(schemas);
     let uploaded = 0;
@@ -384,7 +385,16 @@
       setStatus('syncing', '同步中…');
       try {
         // 每次開啟 APP 第一次同步時重新讀 Notion 欄位，Notion 新增的欄位才接得上
-        if (!schemasFresh) { S().schemas = await loadSchemas(S().mapping); schemasFresh = true; await Store.save(); }
+        if (!schemasFresh) {
+          // APP 新增的格子：Notion 有同名資料表就自動接上（連線時你選「不同步」的不會動）
+          const s0 = S(); const declined = s0.declined || [];
+          const todo = tableMods().filter((m) => !s0.mapping[m.id] && !declined.includes(m.id));
+          if (todo.length) {
+            const list = await discover(); const auto = autoMap(list); const used = new Set(Object.values(s0.mapping));
+            for (const m of todo) if (auto[m.id] && !used.has(auto[m.id])) { s0.mapping[m.id] = auto[m.id]; used.add(auto[m.id]); }
+          }
+          s0.schemas = await loadSchemas(s0.mapping); schemasFresh = true; await Store.save();
+        }
         await push();
         await pull();
         if (S().queue.length) await push();

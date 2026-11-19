@@ -152,3 +152,19 @@ body.busy { cursor: progress; } body.busy .drawer-foot .btn { opacity: .6; point
 .upd-bar .bar { height:5px; background:rgba(255,255,255,.15); border-radius:3px; overflow:hidden; margin-top:4px; }
 .upd-bar .bar i { display:block; height:100%; background:#4caf50; }
 .side-foot .upd { white-space:normal; text-align:left; }
+
+/* 財務總覽 */
+.kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; margin-bottom:12px; }
+.kpi.good .kpi-v { color:#1e8e3e; } .kpi.bad .kpi-v { color:#c0392b; }
+.fin-chart { width:100%; height:auto; display:block; }
+.fin-chart .grid { stroke:#eef0f4; } .fin-chart .axis0 { stroke:#9aa3b2; }
+.fin-chart .tick { font-size:11px; fill:#6b7280; }
+.fin-chart .b-inc { fill:#34a853; } .fin-chart .b-exp { fill:#ea6b5f; }
+.fin-chart .l-net { fill:none; stroke:#1f3b63; stroke-width:2; } .fin-chart .d-net { fill:#1f3b63; }
+.fin-chart .l-cash { fill:none; stroke:#f2a600; stroke-width:2; stroke-dasharray:5 4; }
+.legend { display:flex; gap:14px; font-size:12px; margin-bottom:4px; }
+.lg::before { content:''; display:inline-block; width:12px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.lg.inc::before { background:#34a853; } .lg.exp::before { background:#ea6b5f; } .lg.net::before { background:#1f3b63; height:3px; vertical-align:3px; } .lg.cash::before { background:#f2a600; height:3px; vertical-align:3px; }
+.fin-table td.num, .fin-table th { text-align:right; } .fin-table td:first-child, .fin-table th:first-child { text-align:left; }
+.fin-table .neg { color:#c0392b; } .fin-table tr.future { color:#9aa3b2; }
+.fin-table tfoot td { font-weight:600; border-top:2px solid #d6dbe4; }

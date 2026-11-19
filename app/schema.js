@@ -132,6 +132,7 @@ window.UserError = UserError;
     },
 
     // ---------- 財務 FIN ----------
+    { id: 'finance', group: '財務', title: '財務總覽', icon: '📊', kind: 'finance', desc: '每月收入、支出、營利，加上貸款每月要還多少。金額為未稅，不含「私人」與「封存」的帳。' },
     {
       id: 'ledger', group: '財務', title: '帳務', icon: '💰', kind: 'table', prefix: 'FIN', titleKey: '項目',
       desc: '所有收支。金額為新台幣整數，支出也存正數。月報只計算「已確認」的資料。',
@@ -159,6 +160,26 @@ window.UserError = UserError;
         { key: '備註', type: 'longtext', hint: '待補的事、憑證說明' },
         { key: '月份鍵', type: 'formula', fn: F.月份鍵 },
         { key: '營業稅期別', type: 'formula', fn: F.營業稅期別, list: true }
+      ]
+    },
+    {
+      id: 'loans', group: '財務', title: '貸款', icon: '🏦', kind: 'table', prefix: 'LOAN', titleKey: '貸款名稱',
+      desc: '公司貸款。填好本金、年利率、期數、首期還款日，「財務總覽」就會算出每月還款與剩餘本金。',
+      fields: [
+        { key: '貸款名稱', type: 'text', required: true, list: true },
+        { key: '狀態', type: 'select', options: ['待處理', '還款中', '已還清', '封存'], default: '還款中', list: true, filter: true },
+        { key: '銀行', type: 'text', list: true },
+        { key: '本金', type: 'money', list: true, hint: '借了多少' },
+        { key: '年利率', type: 'number', hint: '例如 2.5 代表 2.5%' },
+        { key: '期數', type: 'number', hint: '總共還幾個月，例如 5 年＝60' },
+        { key: '寬限期', type: 'number', hint: '前幾個月只繳利息，沒有就填 0' },
+        { key: '撥款日', type: 'date' },
+        { key: '首期還款日', type: 'date' },
+        { key: '還款方式', type: 'select', options: ['本息平均攤還', '本金平均攤還'], default: '本息平均攤還', hint: '本息平均攤還＝每月繳一樣多；本金平均攤還＝每月本金一樣、越繳越少' },
+        { key: '每月還款（銀行通知）', type: 'money', hint: '銀行實際通知的每月金額，有填就以這個為準' },
+        { key: '處理部門', type: 'select', options: DEPT, default: 'FIN', hint: '哪個部門負責這件事' },
+        { key: '來源', type: 'select', options: SOURCE, default: '老闆交辦' },
+        { key: '備註', type: 'longtext' }
       ]
     },
     { id: 'tax', group: '財務', title: '營業稅整理', icon: '🧾', kind: 'tax', desc: '依期別自動加總進項、銷項，申報前核對用（試算，以申報系統為準）。' },
